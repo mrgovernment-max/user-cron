@@ -1,6 +1,6 @@
 const mysql = require("mysql2");
 
-// ✅ MySQL Pool with your DB info
+// ✅ MySQL Pool
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "sql8.freesqldatabase.com",
   user: process.env.DB_USER || "sql8792916",
@@ -30,6 +30,9 @@ function updateUserBalances() {
         return pool.end();
       }
 
+      // Counter to track when all queries finish
+      let remaining = miners.length * 2; // each miner has 2 queries: main + history
+
       miners.forEach((miner) => {
         let currentBalance = parseFloat(miner.balance || 0);
         const planType = miner.user_type || "free";
@@ -37,41 +40,45 @@ function updateUserBalances() {
         // Calculate new balance
         currentBalance = calculateNewBalance(currentBalance, planType);
 
-        // 1️⃣ Update main balance in hypercoin_users
+        // 1️⃣ Update main balance
         pool.query(
           "UPDATE hypercoin_users SET balance = ?, last_updated = NOW() WHERE id = ?",
           [currentBalance, miner.id],
           (err) => {
-            if (err) {
+            if (err)
               console.error(
                 `Error updating main balance for user ${miner.id}:`,
                 err
               );
-            } else {
-              console.log(`Main balance updated for user ${miner.id}`);
-            }
+            else console.log(`Main balance updated for user ${miner.id}`);
+
+            remaining--;
+            if (remaining === 0)
+              pool.end(() => console.log("=== Cron Job Finished ==="));
           }
         );
 
-        // 2️⃣ Update balance_history instead of inserting
+        // 2️⃣ Update balance_history
         pool.query(
           `UPDATE balance_history
            SET balance = ?, last_updated = NOW(), mining_state = ?, plan_type = ?
            WHERE user_id = ?`,
           [currentBalance, miner.mining_state || "active", planType, miner.id],
           (err, results) => {
-            if (err) {
+            if (err)
               console.error(
                 `Error updating history for user ${miner.id}:`,
                 err
               );
-            } else if (results.affectedRows === 0) {
+            else if (results.affectedRows === 0)
               console.log(
                 `No history row found for user ${miner.id}, skipping update.`
               );
-            } else {
-              console.log(`History updated for user ${miner.id}`);
-            }
+            else console.log(`History updated for user ${miner.id}`);
+
+            remaining--;
+            if (remaining === 0)
+              pool.end(() => console.log("=== Cron Job Finished ==="));
           }
         );
 
@@ -80,11 +87,6 @@ function updateUserBalances() {
             2
           )}`
         );
-      });
-
-      // End the pool after all queries
-      pool.end(() => {
-        console.log("=== Cron Job Finished ===\n");
       });
     }
   );
