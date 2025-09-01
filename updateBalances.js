@@ -1,35 +1,40 @@
 const mysql = require("mysql2");
 
-// ✅ MySQL Pool
+// ✅ MySQL Pool with your DB info
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || "sql8.freesqldatabase.com",
+  user: process.env.DB_USER || "sql8792916",
+  password: process.env.DB_PASS || "iEdb2pFif4",
+  database: process.env.DB_NAME || "sql8792916",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
 
-// Update balances for active miners
+// Main function
 function updateUserBalances() {
+  console.log("=== Cron Job Started ===", new Date().toLocaleString());
+
   pool.query(
     "SELECT * FROM hypercoin_users WHERE mining_state = 'active'",
     (err, miners) => {
       if (err) {
         console.error("Error selecting users:", err);
-        return;
+        return pool.end();
       }
 
       console.log(`Found ${miners.length} active miners`);
 
+      if (miners.length === 0) {
+        console.log("No active miners found, ending job.");
+        return pool.end();
+      }
+
       miners.forEach((miner) => {
         let currentBalance = parseFloat(miner.balance || 0);
-
-        // Use user_type instead of plan_type
         const planType = miner.user_type || "free";
 
-        // Calculate new balance based on user_type
+        // Calculate new balance
         currentBalance = calculateNewBalance(currentBalance, planType);
 
         // 1️⃣ Update main balance in hypercoin_users
@@ -42,39 +47,50 @@ function updateUserBalances() {
                 `Error updating main balance for user ${miner.id}:`,
                 err
               );
-              return;
+            } else {
+              console.log(`Main balance updated for user ${miner.id}`);
             }
-            console.log(`Main balance updated for user ${miner.id}`);
           }
         );
 
-        // 2️⃣ Insert into balance_history
+        // 2️⃣ Update balance_history instead of inserting
         pool.query(
-          "UPDATE balance_history SET user_id = ?, balance = ?, last_updated = NOW(), mining_state = ?, plan_type = ?",
-          [miner.id, currentBalance, miner.mining_state || "active", planType],
-          (err) => {
+          `UPDATE balance_history
+           SET balance = ?, last_updated = NOW(), mining_state = ?, plan_type = ?
+           WHERE user_id = ?`,
+          [currentBalance, miner.mining_state || "active", planType, miner.id],
+          (err, results) => {
             if (err) {
               console.error(
-                `Error inserting history for user ${miner.id}:`,
+                `Error updating history for user ${miner.id}:`,
                 err
               );
-              return;
+            } else if (results.affectedRows === 0) {
+              console.log(
+                `No history row found for user ${miner.id}, skipping update.`
+              );
+            } else {
+              console.log(`History updated for user ${miner.id}`);
             }
-            console.log(`History inserted for user ${miner.id}`);
           }
         );
 
         console.log(
-          `Updated balance for user ${
-            miner.id
-          } (${planType}): £${currentBalance.toFixed(2)}`
+          `Updated balance for user ${miner.id} (${planType}): £${currentBalance.toFixed(
+            2
+          )}`
         );
+      });
+
+      // End the pool after all queries
+      pool.end(() => {
+        console.log("=== Cron Job Finished ===\n");
       });
     }
   );
 }
 
-// Helper function to calculate balance
+// Helper function
 function calculateNewBalance(currentBalance, planType) {
   let newBalance = currentBalance;
 
