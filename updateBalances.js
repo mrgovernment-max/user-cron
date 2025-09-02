@@ -31,7 +31,7 @@ function updateUserBalances() {
       }
 
       // Counter to track when all queries finish
-      let remaining = miners.length * 2; // each miner has 2 queries: main + history
+      let remaining = miners.length * 1; // each miner has 2 queries: main + history
 
       miners.forEach((miner) => {
         let currentBalance = parseFloat(miner.balance || 0);
@@ -58,34 +58,10 @@ function updateUserBalances() {
           }
         );
 
-        // 2️⃣ Update balance_history
-        pool.query(
-          `UPDATE balance_history
-           SET balance = ?, last_updated = NOW(), mining_state = ?, plan_type = ?
-           WHERE user_id = ?`,
-          [currentBalance, miner.mining_state || "active", planType, miner.id],
-          (err, results) => {
-            if (err)
-              console.error(
-                `Error updating history for user ${miner.id}:`,
-                err
-              );
-            else if (results.affectedRows === 0)
-              console.log(
-                `No history row found for user ${miner.id}, skipping update.`
-              );
-            else console.log(`History updated for user ${miner.id}`);
-
-            remaining--;
-            if (remaining === 0)
-              pool.end(() => console.log("=== Cron Job Finished ==="));
-          }
-        );
-
         console.log(
-          `Updated balance for user ${miner.id} (${planType}): £${currentBalance.toFixed(
-            2
-          )}`
+          `Updated balance for user ${
+            miner.id
+          } (${planType}): £${currentBalance.toFixed(2)}`
         );
       });
     }
