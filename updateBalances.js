@@ -95,12 +95,6 @@ async function sendAlertEmail(user, type) {
   <p style="font-size: 14px; color:#777; margin-top: 16px;">
     You can log in to your dashboard to withdraw profits or adjust your mining preferences.
   </p>
-  <div style="text-align:center; margin-top: 20px;">
-    <a href="https://hypercoin.com/dashboard" 
-       style="background-color:#27ae60; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">
-       Manage Account
-    </a>
-  </div>
 </div>
 `;
     }
