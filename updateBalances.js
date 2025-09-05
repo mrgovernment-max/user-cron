@@ -110,7 +110,7 @@ async function sendAlertEmail(user, type) {
 async function logUserMessage(connection, username, message, type) {
   try {
     await connection.query(
-      "INSERT INTO user_messages (username, message, type, interaction) VALUES (?, ?, ?, 'notseen')",
+      "INSERT INTO user_messages (username, message, type, interactions) VALUES (?, ?, ?, 'notseen')",
       [username, message, type]
     );
     console.log(`📝 Logged message for ${username}: ${message}`);
