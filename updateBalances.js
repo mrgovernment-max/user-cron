@@ -15,91 +15,38 @@ const pool = mysql.createPool({
 // ============================
 // Helper: Calculate New Balance
 // ============================
-function calculateNewBalance(currentBalance, planType) {
-  let newBalance = parseFloat(currentBalance);
-  if (isNaN(newBalance)) newBalance = 0;
+async function sendAlertEmail(user, type) {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "efenteng1@gmail.com",
+        pass: "hrzc cuih sssd ttja", // replace with app password
+      },
+    });
 
-  switch ((planType || "free").toLowerCase()) {
-    case "free":
-      newBalance = 0;
-      break;
-    case "basic":
-      newBalance += Math.random() * 0.1 - 0.05;
-      newBalance = Math.min(Math.max(newBalance, 4), 8);
-      break;
-    case "professional":
-      newBalance += Math.random() * 0.2 - 0.1;
-      newBalance = Math.min(Math.max(newBalance, 10), 15);
-      break;
-    case "expertise":
-      newBalance += Math.random() * 0.3 - 0.15;
-      newBalance = Math.min(Math.max(newBalance, 15), 20);
-      break;
-    default:
-      newBalance += Math.random() * 0.1 - 0.05;
-  }
+    let subject, html;
+    if (type === "stopLoss") {
+      subject = "🚨 Stop-Loss Triggered — Mining Paused";
+      html = `<p>Hello ${user.username}, stop-loss hit. Current balance: £${user.balance}</p>`;
+    } else {
+      subject = "💰 Take-Profit Reached — Mining Paused";
+      html = `<p>Hello ${user.username}, take-profit hit. Current balance: £${user.balance}</p>`;
+    }
 
-  return parseFloat(newBalance.toFixed(2));
-}
+    console.log(`📧 Attempting to send ${type} email to ${user.email}...`);
 
-// ============================
-// Helper: Send Alert Email
-// ============================
-function sendAlertEmail(user, type) {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "efenteng1@gmail.com",
-      pass: "hrzc cuih sssd ttja", // Make sure this is an app password
-    },
-  });
-
-  let subject, html;
-
-  if (type === "stopLoss") {
-    subject = "🚨 Stop-Loss Triggered — Mining Paused";
-    html = `
-      <div style="font-family: Arial; padding: 20px;">
-        <h2 style="color:#c0392b;">🚨 Stop-Loss Triggered</h2>
-        <p>Hello <strong>${user.username}</strong>,</p>
-        <p>Your mining account has been paused because your balance reached or fell below your stop-loss limit.</p>
-        <ul>
-          <li>Current Balance: <strong>£${user.balance}</strong></li>
-          <li>Stop-Loss Limit: <strong>£${user.stop_loss}</strong></li>
-        </ul>
-      </div>`;
-  } else if (type === "takeProfit") {
-    subject = "💰 Take-Profit Reached — Mining Paused";
-    html = `
-      <div style="font-family: Arial; padding: 20px;">
-        <h2 style="color:#27ae60;">💰 Take-Profit Reached</h2>
-        <p>Hello <strong>${user.username}</strong>,</p>
-        <p>Your mining account has been paused because your balance reached or exceeded your take-profit limit.</p>
-        <ul>
-          <li>Current Balance: <strong>£${user.balance}</strong></li>
-          <li>Take-Profit Limit: <strong>£${user.take_profit}</strong></li>
-        </ul>
-      </div>`;
-  }
-
-  console.log(`📧 Sending ${type} email to ${user.email}`);
-  transporter.sendMail(
-    {
+    const info = await transporter.sendMail({
       from: '"HYPERCOIN ALERTS" <efenteng1@gmail.com>',
       to: user.email,
       subject,
       html,
-    },
-    (err, info) => {
-      if (err) {
-        console.error(`❌ Failed to send ${type} email:`, err);
-      } else {
-        console.log(
-          `✅ ${type} email sent to ${user.username}: ${info.response}`
-        );
-      }
-    }
-  );
+    });
+
+    console.log(`✅ ${type} email sent: ${info.response}`);
+  } catch (err) {
+    console.error(`❌ Failed to send ${type} email:`, err);
+  }
 }
 
 // ============================
