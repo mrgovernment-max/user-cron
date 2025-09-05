@@ -16,9 +16,10 @@ const pool = mysql.createPool({
 // Helper: Calculate New Balance
 // ============================
 function calculateNewBalance(currentBalance, planType) {
-  let newBalance = currentBalance;
+  let newBalance = parseFloat(currentBalance);
+  if (isNaN(newBalance)) newBalance = 0;
 
-  switch (planType.toLowerCase()) {
+  switch ((planType || "free").toLowerCase()) {
     case "free":
       newBalance = 0;
       break;
@@ -108,22 +109,15 @@ function updateUserBalances() {
   pool.query(
     "SELECT * FROM hypercoin_users WHERE mining_state = 'active'",
     (err, miners) => {
-      if (err) {
-        console.error("Error selecting users:", err);
-        return pool.end();
-      }
+      if (err) return console.error("Error selecting users:", err);
 
       console.log(`Found ${miners.length} active miners`);
-
-      if (miners.length === 0) {
-        console.log("No active miners found, ending job.");
-        return pool.end();
-      }
+      if (!miners.length) return console.log("No active miners found");
 
       let remaining = miners.length;
 
       miners.forEach((miner) => {
-        let newBalance = calculateNewBalance(miner.balance, miner.user_type);
+        const newBalance = calculateNewBalance(miner.balance, miner.user_type);
 
         pool.query(
           "UPDATE hypercoin_users SET balance = ?, last_updated = NOW() WHERE id = ?",
@@ -141,10 +135,10 @@ function updateUserBalances() {
 
             remaining--;
             if (remaining === 0) {
-              // Run stop-loss and take-profit after all balances updated
+              // After balances updated, run SL/TP checks
               stopLoss();
               takeProfit();
-              // Close pool after all tasks finished
+              // Close pool after 5s to allow queries and emails to finish
               setTimeout(
                 () => pool.end(() => console.log("=== Cron Job Finished ===")),
                 5000
@@ -162,23 +156,23 @@ function updateUserBalances() {
 // ============================
 function stopLoss() {
   pool.query(
-    "SELECT * FROM hypercoin_users WHERE balance <= stop_loss AND mining_state = 'active'",
+    "SELECT * FROM hypercoin_users WHERE balance <= stop_loss AND mining_state = 'active' AND stop_loss IS NOT NULL",
     (err, results) => {
       if (err) return console.error("Stop-Loss query error:", err);
       if (!results.length) return console.log("No stop-loss triggers");
 
       results.forEach((user) => {
-        const sql = `
-        UPDATE hypercoin_users
-        SET mining_state = ?, stop_loss = NULL
-        WHERE id = ?
-      `;
-        pool.query(sql, ["inactive", user.id], (err) => {
-          if (err) return console.error(err);
-          console.log(
-            `Stop-loss triggered for ${user.username}, stop_loss reset to NULL`
-          );
-        });
+        pool.query(
+          "UPDATE hypercoin_users SET mining_state = ?, stop_loss = NULL WHERE id = ?",
+          ["inactive", user.id],
+          (err) => {
+            if (err) return console.error(err);
+            console.log(
+              `Stop-loss triggered for ${user.username}, stop_loss reset to NULL`
+            );
+            sendAlertEmail(user, "stopLoss");
+          }
+        );
       });
     }
   );
@@ -189,29 +183,29 @@ function stopLoss() {
 // ============================
 function takeProfit() {
   pool.query(
-    "SELECT * FROM hypercoin_users WHERE balance >= take_profit AND mining_state = 'active'",
+    "SELECT * FROM hypercoin_users WHERE balance >= take_profit AND mining_state = 'active' AND take_profit IS NOT NULL",
     (err, results) => {
       if (err) return console.error("Take-Profit query error:", err);
       if (!results.length) return console.log("No take-profit triggers");
 
       results.forEach((user) => {
-        const sql = `
-        UPDATE hypercoin_users
-        SET mining_state = ?, take_profit = NULL
-        WHERE id = ?
-      `;
-        pool.query(sql, ["inactive", user.id], (err) => {
-          if (err) return console.error(err);
-          console.log(
-            `Take-profit triggered for ${user.username}, take_profit reset to NULL`
-          );
-        });
+        pool.query(
+          "UPDATE hypercoin_users SET mining_state = ?, take_profit = NULL WHERE id = ?",
+          ["inactive", user.id],
+          (err) => {
+            if (err) return console.error(err);
+            console.log(
+              `Take-profit triggered for ${user.username}, take_profit reset to NULL`
+            );
+            sendAlertEmail(user, "takeProfit");
+          }
+        );
       });
     }
   );
 }
 
 // ============================
-// Run the cron job
+// Start Cron Job
 // ============================
 updateUserBalances();
