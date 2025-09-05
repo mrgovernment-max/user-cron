@@ -1,4 +1,4 @@
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 const nodemailer = require("nodemailer");
 
 // ✅ MySQL Pool
@@ -45,164 +45,102 @@ function calculateNewBalance(currentBalance, planType) {
 // ============================
 // Helper: Send Alert Email
 // ============================
-function sendAlertEmail(user, type) {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "efenteng1@gmail.com",
-      pass: "hrzc cuih sssd ttja",
-    },
-  });
+async function sendAlertEmail(user, type) {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "efenteng1@gmail.com",
+        pass: "hrzc cuih sssd ttja",
+      },
+    });
 
-  let subject, html;
-  if (type === "stopLoss") {
-    subject = "🚨 Stop-Loss Triggered — Mining Paused";
-    html = `
-      <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
-        <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
-          <h2 style="color: #c0392b;">🚨 Stop-Loss Triggered</h2>
-          <p>Hello <strong>${user.username}</strong>,</p>
-          <p>Your mining account has been <strong>paused</strong> because your balance reached or fell below your stop-loss limit.</p>
-          <p>Current Balance: <strong>£${user.balance}</strong><br>Stop-Loss Limit: <strong>£${user.stop_loss}</strong></p>
-          <p>You can log in to review and manually restart mining if you wish.</p>
-          <p style="color: #777; font-size: 13px;">— The HYPERCOIN Risk Management System</p>
-        </div>
-      </div>
-    `;
-  } else if (type === "takeProfit") {
-    subject = "💰 Take-Profit Reached — Mining Paused";
-    html = `
-      <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
-        <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
-          <h2 style="color: #27ae60;">💰 Take-Profit Reached</h2>
-          <p>Hello <strong>${user.username}</strong>,</p>
-          <p>Your mining account has been <strong>paused</strong> because your balance reached or exceeded your take-profit limit.</p>
-          <p>Current Balance: <strong>£${user.balance}</strong><br>Take-Profit Limit: <strong>£${user.take_profit}</strong></p>
-          <p>You can log in to withdraw profits or adjust your plan.</p>
-          <p style="color: #777; font-size: 13px;">— The HYPERCOIN Risk Management System</p>
-        </div>
-      </div>
-    `;
-  }
+    let subject, html;
+    if (type === "stopLoss") {
+      subject = "🚨 Stop-Loss Triggered — Mining Paused";
+      html = `<div style="font-family: Arial, sans-serif; padding:20px;"><h2>Stop-Loss Triggered</h2><p>Hello ${user.username}, mining paused. Balance: £${user.balance}, Stop-Loss: £${user.stop_loss}</p></div>`;
+    } else if (type === "takeProfit") {
+      subject = "💰 Take-Profit Reached — Mining Paused";
+      html = `<div style="font-family: Arial, sans-serif; padding:20px;"><h2>Take-Profit Reached</h2><p>Hello ${user.username}, mining paused. Balance: £${user.balance}, Take-Profit: £${user.take_profit}</p></div>`;
+    }
 
-  transporter.sendMail(
-    {
+    await transporter.sendMail({
       from: '"HYPERCOIN ALERTS" <efenteng1@gmail.com>',
       to: user.email,
       subject,
       html,
-    },
-    (err) => {
-      if (err)
-        console.error(`Error sending ${type} email to ${user.email}:`, err);
-      else console.log(`${type} email sent to ${user.username}`);
-    }
-  );
+    });
+
+    console.log(`${type} email sent to ${user.username}`);
+  } catch (err) {
+    console.error(`Error sending ${type} email to ${user.email}:`, err);
+  }
 }
 
 // ============================
-// Task 1: Update User Balances
+// Task: Process a single user
 // ============================
-function updateUserBalances() {
+async function processUser(user) {
+  try {
+    // 1️⃣ Update balance
+    const newBalance = calculateNewBalance(user.balance, user.user_type);
+    await pool.query(
+      "UPDATE hypercoin_users SET balance = ?, last_updated = NOW() WHERE id = ?",
+      [newBalance, user.id]
+    );
+    console.log(`Balance updated for ${user.username}: £${newBalance}`);
+
+    // 2️⃣ Stop-Loss
+    if (user.stop_loss != null && newBalance <= user.stop_loss) {
+      await pool.query(
+        "UPDATE hypercoin_users SET mining_state = ?, stop_loss = NULL WHERE id = ?",
+        ["inactive", user.id]
+      );
+      console.log(`Stop-loss triggered for ${user.username}`);
+      await sendAlertEmail({ ...user, balance: newBalance }, "stopLoss");
+    }
+
+    // 3️⃣ Take-Profit
+    if (user.take_profit != null && newBalance >= user.take_profit) {
+      await pool.query(
+        "UPDATE hypercoin_users SET mining_state = ?, take_profit = NULL WHERE id = ?",
+        ["inactive", user.id]
+      );
+      console.log(`Take-profit triggered for ${user.username}`);
+      await sendAlertEmail({ ...user, balance: newBalance }, "takeProfit");
+    }
+  } catch (err) {
+    console.error(`Error processing ${user.username}:`, err);
+  }
+}
+
+// ============================
+// Main Cron Job
+// ============================
+async function updateUserBalances() {
   console.log("=== Cron Job Started ===", new Date().toLocaleString());
 
-  pool.query(
-    "SELECT * FROM hypercoin_users WHERE mining_state = 'active'",
-    (err, miners) => {
-      if (err) return console.error("Error selecting users:", err);
+  try {
+    const [miners] = await pool.query(
+      "SELECT * FROM hypercoin_users WHERE mining_state = 'active'"
+    );
 
-      console.log(`Found ${miners.length} active miners`);
-      if (!miners.length) return console.log("No active miners found");
-
-      let remaining = miners.length;
-
-      miners.forEach((miner) => {
-        const newBalance = calculateNewBalance(miner.balance, miner.user_type);
-
-        pool.query(
-          "UPDATE hypercoin_users SET balance = ?, last_updated = NOW() WHERE id = ?",
-          [newBalance, miner.id],
-          (err) => {
-            if (err)
-              console.error(
-                `Error updating balance for ${miner.username}:`,
-                err
-              );
-            else
-              console.log(
-                `Balance updated for ${miner.username}: £${newBalance}`
-              );
-
-            remaining--;
-            if (remaining === 0) {
-              // After balances updated, run SL/TP checks
-              stopLoss();
-              takeProfit();
-              // Close pool after 5s to allow queries and emails to finish
-              setTimeout(
-                () => pool.end(() => console.log("=== Cron Job Finished ===")),
-                5000
-              );
-            }
-          }
-        );
-      });
+    console.log(`Found ${miners.length} active miners`);
+    if (!miners.length) {
+      console.log("No active miners found");
+      return pool.end(() => console.log("=== Cron Job Finished ==="));
     }
-  );
-}
 
-// ============================
-// Task 2: Stop-Loss Check
-// ============================
-function stopLoss() {
-  pool.query(
-    "SELECT * FROM hypercoin_users WHERE balance <= stop_loss AND mining_state = 'active' AND stop_loss IS NOT NULL",
-    (err, results) => {
-      if (err) return console.error("Stop-Loss query error:", err);
-      if (!results.length) return console.log("No stop-loss triggers");
+    // Process all miners in parallel
+    await Promise.all(miners.map(processUser));
 
-      results.forEach((user) => {
-        pool.query(
-          "UPDATE hypercoin_users SET mining_state = ?, stop_loss = NULL WHERE id = ?",
-          ["inactive", user.id],
-          (err) => {
-            if (err) return console.error(err);
-            console.log(
-              `Stop-loss triggered for ${user.username}, stop_loss reset to NULL`
-            );
-            sendAlertEmail(user, "stopLoss");
-          }
-        );
-      });
-    }
-  );
-}
-
-// ============================
-// Task 3: Take-Profit Check
-// ============================
-function takeProfit() {
-  pool.query(
-    "SELECT * FROM hypercoin_users WHERE balance >= take_profit AND mining_state = 'active' AND take_profit IS NOT NULL",
-    (err, results) => {
-      if (err) return console.error("Take-Profit query error:", err);
-      if (!results.length) return console.log("No take-profit triggers");
-
-      results.forEach((user) => {
-        pool.query(
-          "UPDATE hypercoin_users SET mining_state = ?, take_profit = NULL WHERE id = ?",
-          ["inactive", user.id],
-          (err) => {
-            if (err) return console.error(err);
-            console.log(
-              `Take-profit triggered for ${user.username}, take_profit reset to NULL`
-            );
-            sendAlertEmail(user, "takeProfit");
-          }
-        );
-      });
-    }
-  );
+    console.log("All users processed");
+    await pool.end();
+    console.log("=== Cron Job Finished ===");
+  } catch (err) {
+    console.error("Error running cron job:", err);
+    await pool.end();
+  }
 }
 
 // ============================
