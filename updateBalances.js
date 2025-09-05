@@ -14,7 +14,7 @@ const pool = mysql.createPool({
 
 // ============================
 // Helper: Calculate New Balance
-// ============================
+// =============================
 function calculateNewBalance(currentBalance, planType) {
   let newBalance = parseFloat(currentBalance);
   if (isNaN(newBalance)) newBalance = 0;
