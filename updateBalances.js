@@ -71,26 +71,23 @@ async function sendAlertEmail(user, type) {
         <p style="font-size: 14px; color:#777; margin-top: 16px;">
           You can log in to your dashboard to review your settings and resume mining when ready.
         </p>
-      </div>
-      `;
+      </div>`;
     } else {
       subject = "💰 Take-Profit Reached — Mining Paused";
-
       html = `
-<div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
-  <h2 style="color:#27ae60; text-align:center; margin-bottom: 16px;">💰 Take-Profit Reached</h2>
-  <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
-  <p style="font-size: 15px; color:#555; line-height: 1.6;">
-    Congratulations! Your mining session has been <strong>paused</strong> as your balance reached your take-profit target.
-  </p>
-  <p style="font-size: 15px; color:#333;">
-    <strong>Current Balance:</strong> £${user.balance}
-  </p>
-  <p style="font-size: 14px; color:#777; margin-top: 16px;">
-    You can log in to your dashboard to withdraw profits or adjust your mining preferences.
-  </p>
-</div>
-`;
+      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
+        <h2 style="color:#27ae60; text-align:center; margin-bottom: 16px;">💰 Take-Profit Reached</h2>
+        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
+        <p style="font-size: 15px; color:#555; line-height: 1.6;">
+          Congratulations! Your mining session has been <strong>paused</strong> as your balance reached your take-profit target.
+        </p>
+        <p style="font-size: 15px; color:#333;">
+          <strong>Current Balance:</strong> £${user.balance}
+        </p>
+        <p style="font-size: 14px; color:#777; margin-top: 16px;">
+          You can log in to your dashboard to withdraw profits or adjust your mining preferences.
+        </p>
+      </div>`;
     }
 
     console.log(`📧 Attempting to send ${type} email to ${user.email}...`);
@@ -104,6 +101,21 @@ async function sendAlertEmail(user, type) {
     console.log(`✅ ${type} email sent: ${info.response}`);
   } catch (err) {
     console.error(`❌ Failed to send ${type} email:`, err);
+  }
+}
+
+// ============================
+// Helper: Log User Message
+// ============================
+async function logUserMessage(connection, username, message, type) {
+  try {
+    await connection.query(
+      "INSERT INTO user_messages (username, message, type, interaction) VALUES (?, ?, ?, 'notseen')",
+      [username, message, type]
+    );
+    console.log(`📝 Logged message for ${username}: ${message}`);
+  } catch (err) {
+    console.error("❌ Failed to insert user message:", err);
   }
 }
 
@@ -135,7 +147,6 @@ async function updateUserBalances() {
 
         console.log(`💰 Balance updated for ${miner.username}: £${newBalance}`);
 
-        // Update miner object to include new balance
         miner.balance = newBalance;
 
         if (miner.stop_loss != null && newBalance <= miner.stop_loss) {
@@ -145,6 +156,12 @@ async function updateUserBalances() {
             ["inactive", miner.id]
           );
           await sendAlertEmail(miner, "stopLoss");
+          await logUserMessage(
+            connection,
+            miner.username,
+            `Stop-loss triggered. Mining paused. Balance: £${newBalance}`,
+            "stop_loss"
+          );
         }
 
         if (miner.take_profit != null && newBalance >= miner.take_profit) {
@@ -154,6 +171,12 @@ async function updateUserBalances() {
             ["inactive", miner.id]
           );
           await sendAlertEmail(miner, "takeProfit");
+          await logUserMessage(
+            connection,
+            miner.username,
+            `Take-profit triggered. Mining paused. Balance: £${newBalance}`,
+            "take_profit"
+          );
         }
       } catch (minerErr) {
         console.error(`❌ Error processing ${miner.username}:`, minerErr);
@@ -179,5 +202,4 @@ function shutdown(message) {
   });
 }
 
-// Run cron task
 updateUserBalances();
