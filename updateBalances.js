@@ -71,12 +71,6 @@ async function sendAlertEmail(user, type) {
         <p style="font-size: 14px; color:#777; margin-top: 16px;">
           You can log in to your dashboard to review your settings and resume mining when ready.
         </p>
-        <div style="text-align:center; margin-top: 20px;">
-          <a href="https://hypercoin.com/dashboard" 
-             style="background-color:#c0392b; color:white; padding:10px 20px; text-decoration:none; border-radius:5px; font-weight:bold;">
-             View Dashboard
-          </a>
-        </div>
       </div>
       `;
     } else {
