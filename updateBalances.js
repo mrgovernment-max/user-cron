@@ -50,7 +50,7 @@ function sendAlertEmail(user, type) {
     service: "gmail",
     auth: {
       user: "efenteng1@gmail.com",
-      pass: "hrzc cuih sssd ttja",
+      pass: "hrzc cuih sssd ttja", // Make sure this is an app password
     },
   });
 
@@ -82,6 +82,7 @@ function sendAlertEmail(user, type) {
       </div>`;
   }
 
+  console.log(`📧 Sending ${type} email to ${user.email}`);
   transporter.sendMail(
     {
       from: '"HYPERCOIN ALERTS" <efenteng1@gmail.com>',
@@ -89,9 +90,14 @@ function sendAlertEmail(user, type) {
       subject,
       html,
     },
-    (err) => {
-      if (err) console.error(`Error sending ${type} email:`, err);
-      else console.log(`${type} email sent to ${user.username}`);
+    (err, info) => {
+      if (err) {
+        console.error(`❌ Failed to send ${type} email:`, err);
+      } else {
+        console.log(
+          `✅ ${type} email sent to ${user.username}: ${info.response}`
+        );
+      }
     }
   );
 }
@@ -106,7 +112,7 @@ function updateUserBalances() {
     "SELECT * FROM hypercoin_users WHERE mining_state = 'active'",
     (err, miners) => {
       if (err) {
-        console.error("Error selecting users:", err);
+        console.error("❌ Error selecting users:", err);
         return shutdown();
       }
 
@@ -122,18 +128,23 @@ function updateUserBalances() {
           "UPDATE hypercoin_users SET balance = ?, last_updated = NOW() WHERE id = ?",
           [newBalance, miner.id],
           (err) => {
-            if (err)
+            if (err) {
               console.error(
-                `Error updating balance for ${miner.username}:`,
+                `❌ Error updating balance for ${miner.username}:`,
                 err
               );
-            else
-              console.log(
-                `Balance updated for ${miner.username}: £${newBalance}`
-              );
+              return decrementRemaining();
+            }
 
-            checkStopLoss(miner.id, newBalance, miner, () =>
-              checkTakeProfit(miner.id, newBalance, miner, decrementRemaining)
+            console.log(
+              `💰 Balance updated for ${miner.username}: £${newBalance}`
+            );
+
+            // Fresh user object with updated balance
+            const updatedUser = { ...miner, balance: newBalance };
+
+            checkStopLoss(updatedUser, () =>
+              checkTakeProfit(updatedUser, decrementRemaining)
             );
           }
         );
@@ -144,14 +155,14 @@ function updateUserBalances() {
         if (remaining === 0) shutdown("All users processed.");
       }
 
-      function checkStopLoss(userId, balance, user, cb) {
-        if (user.stop_loss != null && balance <= user.stop_loss) {
+      function checkStopLoss(user, cb) {
+        if (user.stop_loss != null && user.balance <= user.stop_loss) {
+          console.log(`⛔ Stop-loss triggered for ${user.username}`);
           pool.query(
             "UPDATE hypercoin_users SET mining_state = ?, stop_loss = NULL WHERE id = ?",
-            ["inactive", userId],
+            ["inactive", user.id],
             (err) => {
               if (err) console.error(err);
-              else console.log(`Stop-loss triggered for ${user.username}`);
               sendAlertEmail(user, "stopLoss");
               cb();
             }
@@ -159,14 +170,14 @@ function updateUserBalances() {
         } else cb();
       }
 
-      function checkTakeProfit(userId, balance, user, cb) {
-        if (user.take_profit != null && balance >= user.take_profit) {
+      function checkTakeProfit(user, cb) {
+        if (user.take_profit != null && user.balance >= user.take_profit) {
+          console.log(`🏆 Take-profit triggered for ${user.username}`);
           pool.query(
             "UPDATE hypercoin_users SET mining_state = ?, take_profit = NULL WHERE id = ?",
-            ["inactive", userId],
+            ["inactive", user.id],
             (err) => {
               if (err) console.error(err);
-              else console.log(`Take-profit triggered for ${user.username}`);
               sendAlertEmail(user, "takeProfit");
               cb();
             }
