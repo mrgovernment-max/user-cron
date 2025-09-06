@@ -66,7 +66,7 @@ async function sendAlertEmail(user, type) {
           Your mining session has been <strong>paused</strong> because your balance dropped below your stop-loss threshold.
         </p>
         <p style="font-size: 15px; color:#333;">
-          <strong>Current Balance:</strong> £${user.balance}
+          <strong>Current Balance:</strong> $${user.balance}
         </p>
         <p style="font-size: 14px; color:#777; margin-top: 16px;">
           You can log in to your dashboard to review your settings and resume mining when ready.
@@ -82,7 +82,7 @@ async function sendAlertEmail(user, type) {
           Congratulations! Your mining session has been <strong>paused</strong> as your balance reached your take-profit target.
         </p>
         <p style="font-size: 15px; color:#333;">
-          <strong>Current Balance:</strong> £${user.balance}
+          <strong>Current Balance:</strong> $${user.balance}
         </p>
         <p style="font-size: 14px; color:#777; margin-top: 16px;">
           You can log in to your dashboard to withdraw profits or adjust your mining preferences.
@@ -145,7 +145,7 @@ async function updateUserBalances() {
           [newBalance, miner.id]
         );
 
-        console.log(`💰 Balance updated for ${miner.username}: £${newBalance}`);
+        console.log(`💰 Balance updated for ${miner.username}: $${newBalance}`);
 
         miner.balance = newBalance;
 
@@ -159,7 +159,7 @@ async function updateUserBalances() {
           await logUserMessage(
             connection,
             miner.username,
-            `Stop-loss triggered. Mining paused. Balance: £${newBalance}`,
+            `Stop-loss triggered. Mining paused. Balance: $${newBalance}`,
             "stop_loss"
           );
         }
@@ -174,7 +174,7 @@ async function updateUserBalances() {
           await logUserMessage(
             connection,
             miner.username,
-            `Take-profit triggered. Mining paused. Balance: £${newBalance}`,
+            `Take-profit triggered. Mining paused. Balance: $${newBalance}`,
             "take_profit"
           );
         }
