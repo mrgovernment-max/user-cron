@@ -23,18 +23,22 @@ function calculateNewBalance(currentBalance, planType) {
     case "free":
       newBalance = 0;
       break;
+
     case "basic":
-      newBalance += Math.random() * 0.1 - 0.05;
-      newBalance = Math.min(Math.max(newBalance, 4), 8);
+      newBalance += Math.random() * 0.1 - 0.05; // Random fluctuation
+      newBalance = Math.min(Math.max(newBalance, -Infinity), 20); // min negative allowed
       break;
+
     case "professional":
       newBalance += Math.random() * 0.2 - 0.1;
-      newBalance = Math.min(Math.max(newBalance, 10), 15);
+      newBalance = Math.min(Math.max(newBalance, -Infinity), 30); // min negative allowed
       break;
+
     case "expertise":
       newBalance += Math.random() * 0.3 - 0.15;
-      newBalance = Math.min(Math.max(newBalance, 15), 20);
+      newBalance = Math.min(Math.max(newBalance, 0), 40); // min = 0, max = 40
       break;
+
     default:
       newBalance += Math.random() * 0.1 - 0.05;
   }
