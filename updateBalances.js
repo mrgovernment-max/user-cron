@@ -57,7 +57,7 @@ async function sendAlertEmail(user, type) {
 
     let subject, html;
     if (type === "stopLoss") {
-      subject = "🚨 Stop-Loss Triggered — Mining Paused";
+      subject = "🚨 Stop-Loss Triggered — Investment Paused";
       html = `
       <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
         <h2 style="color:#c0392b; text-align:center; margin-bottom: 16px;">🚨 Stop-Loss Triggered</h2>
@@ -159,7 +159,7 @@ async function updateUserBalances() {
           await logUserMessage(
             connection,
             miner.username,
-            `Stop-loss triggered. Mining paused. Balance: $${newBalance}`,
+            `Stop-loss triggered. Investment Paused. Balance: $${newBalance}`,
             "stop_loss"
           );
         }
@@ -174,7 +174,7 @@ async function updateUserBalances() {
           await logUserMessage(
             connection,
             miner.username,
-            `Take-profit triggered. Mining paused. Balance: $${newBalance}`,
+            `Take-profit triggered. Investment Paused. Balance: $${newBalance}`,
             "take_profit"
           );
         }
