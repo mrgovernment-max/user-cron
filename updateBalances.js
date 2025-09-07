@@ -50,8 +50,8 @@ async function sendAlertEmail(user, type) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: "efenteng1@gmail.com",
-        pass: "hrzc cuih sssd ttja", // 🔑 Replace with Google App Password
+        user: "shypercoin@gmail.com",
+        pass: "kqqy ptdr syib nlye", // 🔑 Replace with Google App Password
       },
     });
 
@@ -92,7 +92,7 @@ async function sendAlertEmail(user, type) {
 
     console.log(`📧 Attempting to send ${type} email to ${user.email}...`);
     const info = await transporter.sendMail({
-      from: '"HYPERCOIN ALERTS" <efenteng1@gmail.com>',
+      from: '"HYPERCOIN ALERTS" <shypercoin@gmail.com>',
       to: user.email,
       subject,
       html,
