@@ -61,7 +61,7 @@ async function sendTransactionEmail(user, transaction, status) {
 }
 
 // ============================
-// New Task: Check Transactions
+// Check Transactions
 // ============================
 async function checkTransactions() {
   console.log("=== Transaction Check Started ===", new Date().toLocaleString());
@@ -70,7 +70,6 @@ async function checkTransactions() {
   try {
     connection = await pool.getConnection();
 
-    // Get transactions that are either confirmed or failed but not yet processed
     const [transactions] = await connection.query(
       "SELECT * FROM transactions WHERE status IN ('confirmed', 'failed') AND notified = 0"
     );
@@ -80,7 +79,6 @@ async function checkTransactions() {
 
     for (const transaction of transactions) {
       try {
-        // Get user email using username from hypercoin_users
         const [users] = await connection.query(
           "SELECT username, email FROM hypercoin_users WHERE username = ?",
           [transaction.username]
@@ -95,10 +93,8 @@ async function checkTransactions() {
 
         const user = users[0];
 
-        // Send email based on status
         await sendTransactionEmail(user, transaction, transaction.status);
 
-        // Mark transaction as notified
         await connection.query(
           "UPDATE transactions SET notified = 1 WHERE id = ?",
           [transaction.id]
@@ -124,7 +120,7 @@ async function checkTransactions() {
 }
 
 // ============================
-// Helper: Calculate New Balance
+// Calculate New Balance
 // ============================
 function calculateNewBalance(currentBalance, planType) {
   let newBalance = parseFloat(currentBalance);
@@ -134,22 +130,18 @@ function calculateNewBalance(currentBalance, planType) {
     case "free":
       newBalance = 0;
       break;
-
     case "basic":
-      newBalance += Math.random() * 0.1 - 0.05; // Random fluctuation
-      newBalance = Math.min(Math.max(newBalance, -Infinity), 20); // min negative allowed
+      newBalance += Math.random() * 0.1 - 0.05;
+      newBalance = Math.min(Math.max(newBalance, -Infinity), 20);
       break;
-
     case "professional":
       newBalance += Math.random() * 0.2 - 0.1;
-      newBalance = Math.min(Math.max(newBalance, -Infinity), 30); // min negative allowed
+      newBalance = Math.min(Math.max(newBalance, -Infinity), 30);
       break;
-
     case "expertise":
       newBalance += Math.random() * 0.3 - 0.15;
-      newBalance = Math.min(Math.max(newBalance, 0), 40); // min = 0, max = 40
+      newBalance = Math.min(Math.max(newBalance, 0), 40);
       break;
-
     default:
       newBalance += Math.random() * 0.1 - 0.05;
   }
@@ -158,7 +150,7 @@ function calculateNewBalance(currentBalance, planType) {
 }
 
 // ============================
-// Helper: Send Alert Email
+// Send Alert Email
 // ============================
 async function sendAlertEmail(user, type) {
   try {
@@ -166,7 +158,7 @@ async function sendAlertEmail(user, type) {
       service: "gmail",
       auth: {
         user: "shypercoin@gmail.com",
-        pass: "kqqy ptdr syib nlye", // 🔑 Replace with Google App Password
+        pass: "kqqy ptdr syib nlye",
       },
     });
 
@@ -176,51 +168,37 @@ async function sendAlertEmail(user, type) {
       html = `
       <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
         <h2 style="color:#c0392b; text-align:center; margin-bottom: 16px;">🚨 Stop-Loss Triggered</h2>
-        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
-        <p style="font-size: 15px; color:#555; line-height: 1.6;">
-          Your investment session has been <strong>paused</strong> because your balance dropped below your stop-loss threshold.
-        </p>
-        <p style="font-size: 15px; color:#333;">
-          <strong>Current Balance:</strong> $${user.balance}
-        </p>
-        <p style="font-size: 14px; color:#777; margin-top: 16px;">
-          You can log in to your dashboard to review your settings and resume investment when ready.
-        </p>
+        <p>Dear <strong>${user.username}</strong>,</p>
+        <p>Your investment session has been paused because your balance dropped below your stop-loss threshold.</p>
+        <p><strong>Current Balance:</strong> $${user.balance}</p>
       </div>`;
     } else {
-      subject = "💰 Take-Profit Reached — investment Paused";
+      subject = "💰 Take-Profit Reached — Investment Paused";
       html = `
       <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
         <h2 style="color:#27ae60; text-align:center; margin-bottom: 16px;">💰 Take-Profit Reached</h2>
-        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
-        <p style="font-size: 15px; color:#555; line-height: 1.6;">
-          Congratulations! Your investment session has been <strong>paused</strong> as your balance reached your take-profit target.
-        </p>
-        <p style="font-size: 15px; color:#333;">
-          <strong>Current Balance:</strong> $${user.balance}
-        </p>
-        <p style="font-size: 14px; color:#777; margin-top: 16px;">
-          You can log in to your dashboard to withdraw profits or adjust your investment preferences.
-        </p>
+        <p>Dear <strong>${user.username}</strong>,</p>
+        <p>Congratulations! Your investment session has been paused as your balance reached your take-profit target.</p>
+        <p><strong>Current Balance:</strong> $${user.balance}</p>
       </div>`;
     }
 
     console.log(`📧 Attempting to send ${type} email to ${user.email}...`);
-    const info = await transporter.sendMail({
+    await transporter.sendMail({
       from: '"HYPERCOIN ALERTS" <shypercoin@gmail.com>',
       to: user.email,
       subject,
       html,
     });
 
-    console.log(`✅ ${type} email sent: ${info.response}`);
+    console.log(`✅ ${type} email sent`);
   } catch (err) {
     console.error(`❌ Failed to send ${type} email:`, err);
   }
 }
 
 // ============================
-// Helper: Log User Message
+// Log User Message
 // ============================
 async function logUserMessage(connection, username, message, type) {
   try {
@@ -235,7 +213,7 @@ async function logUserMessage(connection, username, message, type) {
 }
 
 // ============================
-// Main Task: Update Balances
+// Update User Balances
 // ============================
 async function updateUserBalances() {
   console.log("=== Cron Job Started ===", new Date().toLocaleString());
@@ -249,7 +227,7 @@ async function updateUserBalances() {
     );
 
     console.log(`Found ${miners.length} active miners`);
-    if (!miners.length) return shutdown("No active miners found");
+    if (!miners.length) return console.log("No active miners found");
 
     for (const miner of miners) {
       try {
@@ -298,10 +276,9 @@ async function updateUserBalances() {
       }
     }
 
-    shutdown("All users processed.");
+    console.log("All users processed.");
   } catch (err) {
     console.error("❌ Error running balance update:", err);
-    shutdown();
   } finally {
     if (connection) connection.release();
   }
@@ -317,4 +294,13 @@ function shutdown(message) {
   });
 }
 
-updateUserBalances().then(checkTransactions);
+// ============================
+// Main Execution
+// ============================
+async function main() {
+  await updateUserBalances();
+  await checkTransactions();
+  shutdown("✅ Finished balances & transactions check.");
+}
+
+main();
