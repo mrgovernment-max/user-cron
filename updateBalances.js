@@ -13,6 +13,117 @@ const pool = mysql.createPool({
 });
 
 // ============================
+// Helper: Send Transaction Email
+// ============================
+async function sendTransactionEmail(user, transaction, status) {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "shypercoin@gmail.com",
+        pass: "kqqy ptdr syib nlye",
+      },
+    });
+
+    let subject, html;
+    if (status === "confirmed") {
+      subject = "✅ Transaction Confirmed";
+      html = `
+      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
+        <h2 style="color:#27ae60; text-align:center; margin-bottom: 16px;">✅ Transaction Successful</h2>
+        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
+        <p style="font-size: 15px; color:#555;">Your transaction of <strong>$${transaction.amount}</strong> has been successfully confirmed.</p>
+        <p style="font-size: 14px; color:#777; margin-top: 16px;">Reference: ${transaction.reference}</p>
+      </div>`;
+    } else {
+      subject = "❌ Transaction Failed";
+      html = `
+      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
+        <h2 style="color:#c0392b; text-align:center; margin-bottom: 16px;">❌ Transaction Failed</h2>
+        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
+        <p style="font-size: 15px; color:#555;">Unfortunately, your transaction of <strong>$${transaction.amount}</strong> has failed.</p>
+        <p style="font-size: 14px; color:#777; margin-top: 16px;">Reference: ${transaction.reference}</p>
+      </div>`;
+    }
+
+    console.log(`📧 Sending ${status} email to ${user.email}...`);
+    await transporter.sendMail({
+      from: '"HYPERCOIN ALERTS" <shypercoin@gmail.com>',
+      to: user.email,
+      subject,
+      html,
+    });
+
+    console.log(`✅ ${status.toUpperCase()} email sent to ${user.email}`);
+  } catch (err) {
+    console.error(`❌ Failed to send ${status} email:`, err);
+  }
+}
+
+// ============================
+// New Task: Check Transactions
+// ============================
+async function checkTransactions() {
+  console.log("=== Transaction Check Started ===", new Date().toLocaleString());
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+
+    // Get transactions that are either confirmed or failed but not yet processed
+    const [transactions] = await connection.query(
+      "SELECT * FROM transactions WHERE status IN ('confirmed', 'failed') AND notified = 0"
+    );
+
+    console.log(`Found ${transactions.length} transactions to process`);
+    if (!transactions.length) return console.log("No transactions to process");
+
+    for (const transaction of transactions) {
+      try {
+        // Get user email using username from hypercoin_users
+        const [users] = await connection.query(
+          "SELECT username, email FROM hypercoin_users WHERE username = ?",
+          [transaction.username]
+        );
+
+        if (!users.length) {
+          console.warn(
+            `⚠️ No user found for username: ${transaction.username}`
+          );
+          continue;
+        }
+
+        const user = users[0];
+
+        // Send email based on status
+        await sendTransactionEmail(user, transaction, transaction.status);
+
+        // Mark transaction as notified
+        await connection.query(
+          "UPDATE transactions SET notified = 1 WHERE id = ?",
+          [transaction.id]
+        );
+
+        console.log(
+          `✅ Transaction ${transaction.reference} marked as notified`
+        );
+      } catch (txErr) {
+        console.error(
+          `❌ Error processing transaction ${transaction.reference}:`,
+          txErr
+        );
+      }
+    }
+
+    console.log("All transactions processed ✅");
+  } catch (err) {
+    console.error("❌ Error checking transactions:", err);
+  } finally {
+    if (connection) connection.release();
+  }
+}
+
+// ============================
 // Helper: Calculate New Balance
 // ============================
 function calculateNewBalance(currentBalance, planType) {
@@ -206,4 +317,4 @@ function shutdown(message) {
   });
 }
 
-updateUserBalances();
+updateUserBalances().then(checkTransactions);
