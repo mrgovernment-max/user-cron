@@ -27,20 +27,52 @@ async function sendTransactionEmail(user, transaction, status) {
 
     let subject, html;
     if (status === "confirmed") {
-      subject = "✅ Transaction Confirmed";
+      subject = "✅ Transaction Confirmed – HyperCoin";
       html = `
-      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
-        <h2 style="color:#27ae60; text-align:center; margin-bottom: 16px;">✅ Transaction Successful</h2>
-        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
-        <p style="font-size: 15px; color:#555;">Your transaction of <strong>$${transaction.amount}</strong> has been successfully confirmed.</p>
+      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e0e0e0; max-width: 600px; margin: auto;">
+        <h2 style="color:#27ae60; text-align:center; margin-bottom: 24px;">✅ Transaction Successful</h2>
+        <p style="font-size: 16px; color:#333;">Hello <strong>${user.username}</strong>,</p>
+        <p style="font-size: 15px; color:#555; line-height: 1.6;">
+          Your recent transaction has been <strong>successfully processed</strong>. Here are the details:
+        </p>
+        <table style="width:100%; margin-top:16px; border-collapse: collapse;">
+          <tr>
+            <td style="padding:8px; border:1px solid #e0e0e0;">Amount</td>
+            <td style="padding:8px; border:1px solid #e0e0e0;">$${transaction.amount}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px; border:1px solid #e0e0e0;">Status</td>
+            <td style="padding:8px; border:1px solid #e0e0e0;">Completed</td>
+          </tr>
+        </table>
+        <p style="font-size: 14px; color:#777; margin-top: 24px;">
+          You can log in to your dashboard to view more details or download a receipt.
+        </p>
+        <p style="font-size: 14px; color:#777;">Thank you for using HyperCoin!</p>
       </div>`;
     } else {
-      subject = "❌ Transaction Failed";
+      subject = "❌ Transaction Failed – HyperCoin";
       html = `
-      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #f9f9f9; border-radius: 10px; border: 1px solid #ddd; max-width: 500px; margin: auto;">
-        <h2 style="color:#c0392b; text-align:center; margin-bottom: 16px;">❌ Transaction Failed</h2>
-        <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
-        <p style="font-size: 15px; color:#555;">Unfortunately, your transaction of <strong>$${transaction.amount}</strong> has failed.</p>
+      <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e0e0e0; max-width: 600px; margin: auto;">
+        <h2 style="color:#c0392b; text-align:center; margin-bottom: 24px;">❌ Transaction Failed</h2>
+        <p style="font-size: 16px; color:#333;">Hello <strong>${user.username}</strong>,</p>
+        <p style="font-size: 15px; color:#555; line-height: 1.6;">
+          Unfortunately, your recent transaction could not be processed. Here are the details:
+        </p>
+        <table style="width:100%; margin-top:16px; border-collapse: collapse;">
+          <tr>
+            <td style="padding:8px; border:1px solid #e0e0e0;">Amount</td>
+            <td style="padding:8px; border:1px solid #e0e0e0;">$${transaction.amount}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px; border:1px solid #e0e0e0;">Status</td>
+            <td style="padding:8px; border:1px solid #e0e0e0;">Failed</td>
+          </tr>
+        </table>
+        <p style="font-size: 14px; color:#777; margin-top: 24px;">
+          Please check your payment method or contact support if the issue persists.
+        </p>
+        <p style="font-size: 14px; color:#777;">Thank you for using HyperCoin!</p>
       </div>`;
     }
 
