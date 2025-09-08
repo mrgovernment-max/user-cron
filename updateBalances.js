@@ -33,7 +33,6 @@ async function sendTransactionEmail(user, transaction, status) {
         <h2 style="color:#27ae60; text-align:center; margin-bottom: 16px;">✅ Transaction Successful</h2>
         <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
         <p style="font-size: 15px; color:#555;">Your transaction of <strong>$${transaction.amount}</strong> has been successfully confirmed.</p>
-        <p style="font-size: 14px; color:#777; margin-top: 16px;">Reference: ${transaction.reference}</p>
       </div>`;
     } else {
       subject = "❌ Transaction Failed";
@@ -42,7 +41,6 @@ async function sendTransactionEmail(user, transaction, status) {
         <h2 style="color:#c0392b; text-align:center; margin-bottom: 16px;">❌ Transaction Failed</h2>
         <p style="font-size: 16px; color:#333;">Dear <strong>${user.username}</strong>,</p>
         <p style="font-size: 15px; color:#555;">Unfortunately, your transaction of <strong>$${transaction.amount}</strong> has failed.</p>
-        <p style="font-size: 14px; color:#777; margin-top: 16px;">Reference: ${transaction.reference}</p>
       </div>`;
     }
 
